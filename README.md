@@ -12,5 +12,5 @@ disponibilizado para livre uso dos programadores!
 # Uso
 
 ```go
-    http.ListenAndServe(":8080", stcpbusapi.Handler)
+http.ListenAndServe(":8080", stcpbusapi.Handler)
 ```
