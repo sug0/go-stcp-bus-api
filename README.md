@@ -1,4 +1,4 @@
-# API não oficial dos autocarros da STCP
+# 🚌🚏 API não oficial dos autocarros da STCP
 
 Este código em Go permite obter o tempo real de espera dos autocarros da
 STCP no Porto, sob a forma de um leve serviço HTTP.
