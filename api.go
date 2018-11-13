@@ -111,7 +111,7 @@ func getBuses(code string) ([]*html.Node, int) {
 }
 
 func downloadHTML(code string) (io.ReadCloser, int) {
-    rsp, err := http.Get("http://www.stcp.pt/pt/itinerarium/soapclient.php?codigo="+code)
+    rsp, err := http.Get("https://www.stcp.pt/pt/itinerarium/soapclient.php?codigo="+code)
     if err != nil {
         return nil, errSTCPOffline
     }
