@@ -11,8 +11,6 @@ import (
     "github.com/valyala/bytebufferpool"
 )
 
-type handler struct{}
-
 // The http.Handler for this API endpoint. Responses
 // are in JSON, arguments are taken from the request
 // path.
