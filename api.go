@@ -81,7 +81,7 @@ func fmtBus(ctx *fasthttp.RequestCtx, comma bool, bus *html.Node) {
 
     // print time
     td = td.NextSibling.NextSibling
-    fmt.Fprintf(ctx, `"tempo":"%s",`, scrape.Text(td))
+    fmt.Fprintf(ctx, `"hora":"%s",`, scrape.Text(td))
 
     // print await time
     td = td.NextSibling.NextSibling
