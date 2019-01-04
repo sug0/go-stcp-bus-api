@@ -23,8 +23,8 @@ const (
 )
 
 var errHandleFuns = [...]func(*fasthttp.RequestCtx){
-    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"erro":"O API da STCP esta offline."}`)},
-    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"erro":"O API respondeu com HTML invalido."}`)},
+    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"erro":"O API da STCP est\u00e1 offline."}`)},
+    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"erro":"O API respondeu com HTML inv\u00e1lido."}`)},
     func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"carros":[]}`)},
 }
 
@@ -37,7 +37,7 @@ func stcpHandler(ctx *fasthttp.RequestCtx) {
 
     // no bus stop code in path
     if bytes.Equal(stop, []byte("/")) {
-        ctx.WriteString(`{"erro":"Nenhum codigo de paragem encontrado no caminho."}`)
+        ctx.WriteString(`{"erro":"Nenhum c\u00f3digo de paragem encontrado no caminho."}`)
         return
     }
 
