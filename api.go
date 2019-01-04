@@ -1,13 +1,14 @@
 package stcpbusapi
 
 import (
-    "io"
     "fmt"
-    "net/http"
+    "bytes"
 
     "golang.org/x/net/html"
     "golang.org/x/net/html/atom"
     "github.com/yhat/scrape"
+    "github.com/valyala/fasthttp"
+    "github.com/valyala/bytebufferpool"
 )
 
 type handler struct{}
@@ -15,7 +16,7 @@ type handler struct{}
 // The http.Handler for this API endpoint. Responses
 // are in JSON, arguments are taken from the request
 // path.
-var Handler handler
+var Handler fasthttp.RequestHandler
 
 const (
     errSTCPOffline = -1 - iota
@@ -23,21 +24,27 @@ const (
     errNoBuses
 )
 
-var errHandleFuns = [...]func(http.ResponseWriter){
-    func(w http.ResponseWriter) {fmt.Fprintf(w, `{"erro":"O API da STCP esta offline."}`)},
-    func(w http.ResponseWriter) {fmt.Fprintf(w, `{"erro":"O API respondeu com HTML invalido."}`)},
-    func(w http.ResponseWriter) {fmt.Fprintf(w, `{"carros":[]}`)},
+var errHandleFuns = [...]func(*fasthttp.RequestCtx){
+    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"erro":"O API da STCP esta offline."}`)},
+    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"erro":"O API respondeu com HTML invalido."}`)},
+    func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"carros":[]}`)},
 }
 
-func (handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func init() {
+    Handler = stcpHandler
+}
+
+func stcpHandler(ctx *fasthttp.RequestCtx) {
+    stop := ctx.Path()
+
     // no bus stop code in path
-    if r.URL.Path == "/" {
-        fmt.Fprintf(w, `{"erro":"Nenhum codigo de paragem encontrado no caminho."}`)
+    if bytes.Equal(stop, []byte("/")) {
+        ctx.WriteString(`{"erro":"Nenhum codigo de paragem encontrado no caminho."}`)
         return
     }
 
     // trim outer slashes
-    stop := r.URL.Path[1:]
+    stop = stop[1:]
     n := len(stop) - 1
 
     if stop[n] == '/' {
@@ -49,7 +56,7 @@ func (handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
     // error handling
     if errno < 0 {
-        errHandleFuns[-errno - 1](w)
+        errHandleFuns[-errno - 1](ctx)
         return
     }
 
@@ -58,43 +65,43 @@ func (handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     n = len(buses) - 1
 
     // write beginning
-    fmt.Fprintf(w, `{"carros":[`)
+    ctx.WriteString(`{"carros":[`)
 
     for i := 0; i < n; i++ {
-        fmtBus(w, true, buses[i])
+        fmtBus(ctx, true, buses[i])
     }
 
     // write end
-    fmtBus(w, false, buses[n])
-    fmt.Fprintf(w, `]}`)
+    fmtBus(ctx, false, buses[n])
+    ctx.WriteString(`]}`)
 }
 
-func fmtBus(w http.ResponseWriter, comma bool, bus *html.Node) {
+func fmtBus(ctx *fasthttp.RequestCtx, comma bool, bus *html.Node) {
     // print car
     td := bus.FirstChild.NextSibling
-    fmt.Fprintf(w, `{"carro":"%s",`, scrape.Text(td))
+    fmt.Fprintf(ctx, `{"carro":"%s",`, scrape.Text(td))
 
     // print time
     td = td.NextSibling.NextSibling
-    fmt.Fprintf(w, `"tempo":"%s",`, scrape.Text(td))
+    fmt.Fprintf(ctx, `"tempo":"%s",`, scrape.Text(td))
 
     // print await time
     td = td.NextSibling.NextSibling
-    fmt.Fprintf(w, `"espera":"%s"}`, scrape.Text(td))
+    fmt.Fprintf(ctx, `"espera":"%s"}`, scrape.Text(td))
 
     if comma {
-        fmt.Fprintf(w, ",")
+        ctx.WriteString(",")
     }
 }
 
-func getBuses(code string) ([]*html.Node, int) {
-    body, errno := downloadHTML(code)
+func getBuses(code []byte) ([]*html.Node, int) {
+    buf, body, errno := downloadHTML(code)
     if errno != 0 {
         return nil, errno
     }
-    defer body.Close()
+    defer bytebufferpool.Put(buf)
 
-    root, err := html.Parse(body)
+    root, err := html.Parse(bytes.NewReader(body))
     if err != nil {
         return nil, errNoParse
     }
@@ -110,12 +117,14 @@ func getBuses(code string) ([]*html.Node, int) {
     return rows, 0
 }
 
-func downloadHTML(code string) (io.ReadCloser, int) {
-    rsp, err := http.Get("https://www.stcp.pt/pt/itinerarium/soapclient.php?codigo="+code)
+func downloadHTML(code []byte) (*bytebufferpool.ByteBuffer, []byte, int) {
+    buf := bytebufferpool.Get()
+    path := "https://www.stcp.pt/pt/itinerarium/soapclient.php?codigo="+string(code)
+    _, rsp, err := fasthttp.Get(buf.B, path)
     if err != nil {
-        return nil, errSTCPOffline
+        return nil, nil, errSTCPOffline
     }
-    return rsp.Body, 0
+    return buf, rsp, 0
 }
 
 func matchRow(n *html.Node) bool {
