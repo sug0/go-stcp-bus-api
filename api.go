@@ -11,9 +11,9 @@ import (
     "github.com/valyala/bytebufferpool"
 )
 
-// The http.Handler for this API endpoint. Responses
+// The fasthttp.RequestHandler for this API endpoint. Responses
 // are in JSON, arguments are taken from the request
-// path.
+// path. Example: http://localhost:8080/BCM1
 var Handler fasthttp.RequestHandler
 
 const (
