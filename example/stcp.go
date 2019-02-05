@@ -4,7 +4,7 @@ import (
     "os"
 
     "github.com/valyala/fasthttp"
-    "github.com/sugoiuguu/go-stcp-bus-api"
+    "github.com/sug0/go-stcp-bus-api"
 )
 
 func main() {
