@@ -9,6 +9,7 @@ import (
     "github.com/yhat/scrape"
     "github.com/valyala/fasthttp"
     "github.com/valyala/bytebufferpool"
+    "github.com/coocood/freecache"
 )
 
 // The fasthttp.RequestHandler for this API endpoint. Responses
@@ -28,8 +29,14 @@ var errHandleFuns = [...]func(*fasthttp.RequestCtx){
     func(ctx *fasthttp.RequestCtx) {ctx.WriteString(`{"carros":[]}`)},
 }
 
+var cache *freecache.Cache
+
+// 25 seconds cache timeout
+const cacheTimeout = 25
+
 func init() {
     Handler = stcpHandler
+    cache = freecache.NewCache(1 << 14)
 }
 
 func stcpHandler(ctx *fasthttp.RequestCtx) {
@@ -49,6 +56,14 @@ func stcpHandler(ctx *fasthttp.RequestCtx) {
         stop = stop[:n]
     }
 
+    // try to fetch from cache
+    rsp, err := cache.Get(stop)
+    if err == nil {
+        // cache hit!
+        ctx.Write(rsp)
+        return
+    }
+
     // download bus info
     buses, errno := getBuses(stop)
 
@@ -62,33 +77,40 @@ func stcpHandler(ctx *fasthttp.RequestCtx) {
     buses = buses[1:]
     n = len(buses) - 1
 
+    var buf bytes.Buffer
+
     // write beginning
-    ctx.WriteString(`{"carros":[`)
+    buf.WriteString(`{"carros":[`)
 
     for i := 0; i < n; i++ {
-        fmtBus(ctx, true, buses[i])
+        fmtBus(&buf, true, buses[i])
     }
 
     // write end
-    fmtBus(ctx, false, buses[n])
-    ctx.WriteString(`]}`)
+    fmtBus(&buf, false, buses[n])
+    buf.WriteString(`]}`)
+
+    // save to cache, and write response
+    rsp = buf.Bytes()
+    cache.Set(stop, rsp, cacheTimeout)
+    ctx.Write(rsp)
 }
 
-func fmtBus(ctx *fasthttp.RequestCtx, comma bool, bus *html.Node) {
+func fmtBus(buf *bytes.Buffer, comma bool, bus *html.Node) {
     // print car
     td := bus.FirstChild.NextSibling
-    fmt.Fprintf(ctx, `{"carro":"%s",`, scrape.Text(td))
+    fmt.Fprintf(buf, `{"carro":"%s",`, scrape.Text(td))
 
     // print time
     td = td.NextSibling.NextSibling
-    fmt.Fprintf(ctx, `"hora":"%s",`, scrape.Text(td))
+    fmt.Fprintf(buf, `"hora":"%s",`, scrape.Text(td))
 
     // print await time
     td = td.NextSibling.NextSibling
-    fmt.Fprintf(ctx, `"espera":"%s"}`, scrape.Text(td))
+    fmt.Fprintf(buf, `"espera":"%s"}`, scrape.Text(td))
 
     if comma {
-        ctx.WriteString(",")
+        buf.WriteString(",")
     }
 }
 
